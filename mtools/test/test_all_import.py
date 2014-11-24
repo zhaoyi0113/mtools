@@ -11,6 +11,7 @@ tools = [MLogFilterTool, MLogVisTool, MLogInfoTool]
 
 # mlaunch depends on pymongo
 try:
+    import pymongo
     from mtools.mlaunch.mlaunch import MLaunchTool
     tools.append(MLaunchTool)
 except ImportError:
@@ -19,6 +20,7 @@ except ImportError:
 
 # mplotqueries depends on matplotlib
 try:
+    import matplotlib
     from mtools.mplotqueries.mplotqueries import MPlotQueriesTool
     tools.append(MPlotQueriesTool)
 except ImportError:
