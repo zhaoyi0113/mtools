@@ -289,11 +289,12 @@ class MLaunchTool(BaseCmdLineTool):
             self.args['csrs'] = True
 
         # check if authentication is enabled, make key file
-        if self.args['auth'] and first_init and os.name != 'nt':
+        if self.args['auth'] and first_init:
             if not os.path.exists(self.dir):
                 os.makedirs(self.dir)
             os.system('openssl rand -base64 753 > %s/keyfile'%self.dir)
-            os.system('chmod 600 %s/keyfile'%self.dir)
+            if os.name != 'nt':
+                os.system('chmod 600 %s/keyfile'%self.dir)
 
         # construct startup strings
         self._construct_cmdlines()
@@ -675,7 +676,6 @@ class MLaunchTool(BaseCmdLineTool):
             if port in matches:
                 p = processes[port]
                 p.send_signal(sig)
-                print " %s on port %i, pid=%i" % (p.name, port, p.pid)
                 if self.args['verbose']:
                     print " %s on port %i, pid=%i" % (p.name, port, p.pid)
 
@@ -1055,15 +1055,19 @@ class MLaunchTool(BaseCmdLineTool):
             would be accepted for a mongod.
         """
 
+        # get the help list of the binary
         if self.args and self.args['binarypath']:
             binary = os.path.join( self.args['binarypath'], binary)
-
-        # get the help list of the binary
-        ret = subprocess.Popen(['%s --help'%binary], stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        if os.name == 'nt':
+            print 'launch '
+            ret = subprocess.Popen('%s --help'%binary, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        else:
+            ret = subprocess.Popen(['%s --help'%binary], stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        
+        
         out, err = ret.communicate()
 
         accepted_arguments = []
-
         # extract all arguments starting with a '-'
         for line in [option for option in out.split('\n')]:
             line = line.lstrip()
@@ -1073,7 +1077,7 @@ class MLaunchTool(BaseCmdLineTool):
                 if config and argument in ['--oplogSize', '--storageEngine', '--smallfiles', '--nojournal']:
                     continue
                 accepted_arguments.append(argument)
-
+        
         # add undocumented options
         accepted_arguments.append('--setParameter')
         if binary == "mongod":
@@ -1131,8 +1135,9 @@ class MLaunchTool(BaseCmdLineTool):
 
             try:
                 if os.name == 'nt':
-                    # print "command str ", filter(None, command_str.split(' ')), "."
                     ret = subprocess.check_call(filter(None, command_str.split(' ')), shell=True)
+                    # create sub process on windows doesn't wait for output, wait a few seconds for mongod instance up
+                    time.sleep(5)
                 else:
                     ret = subprocess.check_output([command_str], stderr=subprocess.STDOUT, shell=True)
 
@@ -1437,11 +1442,11 @@ class MLaunchTool(BaseCmdLineTool):
             extra = self._filter_valid_arguments(self.unknown_args, "mongos") + extra
 
         path = self.args['binarypath'] or ''
-	if os.name == 'nt':
+        if os.name == 'nt':
             newLogPath=logpath.replace('\\', '\\\\')
-            command_str = "start /b %s --logpath %s --port %i --configdb %s --logappend %s %s "%(os.path.join(path, 'mongos'), logpath, port, configdb, auth_param, extra)
-	else:
-            command_str = "%s --logpath %s --port %i --configdb %s --logappend %s %s --fork"%(os.path.join(path, 'mongos'), newLogPath, port, configdb, auth_param, extra)
+            command_str = "start /b %s --logpath %s --port %i --configdb %s --logappend %s %s "%(os.path.join(path, 'mongos'), newLogPath, port, configdb, auth_param, extra)
+        else:
+            command_str = "%s --logpath %s --port %i --configdb %s --logappend %s %s --fork"%(os.path.join(path, 'mongos'), logpath, port, configdb, auth_param, extra)
 
         # store parameters in startup_info
         self.startup_info[str(port)] = command_str
